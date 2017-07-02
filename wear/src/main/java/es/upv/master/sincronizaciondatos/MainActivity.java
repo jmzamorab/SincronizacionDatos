@@ -5,10 +5,13 @@ import android.os.Bundle;
 import android.widget.TextView;
 
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataItem;
+import com.google.android.gms.wearable.DataItemBuffer;
 import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.DataMapItem;
 import com.google.android.gms.wearable.MessageApi;
@@ -31,67 +34,87 @@ public class MainActivity extends Activity implements MessageApi.MessageListener
         setContentView(R.layout.activity_main);
         textView = (TextView) findViewById(R.id.textView);
         apiClient = new GoogleApiClient.Builder(this).addApi(Wearable.API).addConnectionCallbacks(this).build();
-    }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-        apiClient.connect();
-    }
-
-    @Override
-    protected void onStop() {
-        Wearable.MessageApi.removeListener(apiClient, this);
-        if (apiClient != null && apiClient.isConnected()) {
-            apiClient.disconnect();
-        }
-        Wearable.DataApi.removeListener(apiClient, this);
-        super.onStop();
-    }
-
-
-    @Override
-    public void onConnected(Bundle bundle) {
-        Wearable.MessageApi.addListener(apiClient, this);
-        Wearable.DataApi.addListener(apiClient, this);
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-    }
-
-    @Override
-    public void onDataChanged(DataEventBuffer eventos) {
-        for (DataEvent evento : eventos) {
-            if (evento.getType() == DataEvent.TYPE_CHANGED) {
-                DataItem item = evento.getDataItem();
-                if (item.getUri().getPath().equals(ITEM_CONTADOR)) {
-                    DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
-                    contador = dataMap.getInt(KEY_CONTADOR);
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            ((TextView) findViewById(R.id.textoContador)).setText(Integer.toString(contador));
-                        }
-                    });
+        PendingResult<DataItemBuffer> resultado = Wearable.DataApi.getDataItems(apiClient);
+        resultado.setResultCallback(new ResultCallback<DataItemBuffer>() {
+            @Override
+            public void onResult(DataItemBuffer dataItems) {
+                for (DataItem dataItem : dataItems) {
+                    if (dataItem.getUri().getPath().equals(ITEM_CONTADOR)) {
+                        DataMapItem dataMapItem = DataMapItem.fromDataItem(dataItem);
+                        contador = dataMapItem.getDataMap().getInt(KEY_CONTADOR);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                ((TextView) findViewById(R.id.textoContador)).setText(Integer.toString(contador));
+                            }
+                        });
+                    }
                 }
-            } else if (evento.getType() == DataEvent.TYPE_DELETED) {
-                // Algún ítem ha sido borrado
+                dataItems.release();
+            }
+        });
+    }
+
+        @Override
+        protected void onStart () {
+            super.onStart();
+            apiClient.connect();
+        }
+
+        @Override
+        protected void onStop () {
+            Wearable.MessageApi.removeListener(apiClient, this);
+            if (apiClient != null && apiClient.isConnected()) {
+                apiClient.disconnect();
+            }
+            Wearable.DataApi.removeListener(apiClient, this);
+            super.onStop();
+        }
+
+
+        @Override
+        public void onConnected (Bundle bundle){
+            Wearable.MessageApi.addListener(apiClient, this);
+            Wearable.DataApi.addListener(apiClient, this);
+        }
+
+        @Override
+        public void onConnectionSuspended ( int i){
+        }
+
+        @Override
+        public void onDataChanged (DataEventBuffer eventos){
+            for (DataEvent evento : eventos) {
+                if (evento.getType() == DataEvent.TYPE_CHANGED) {
+                    DataItem item = evento.getDataItem();
+                    if (item.getUri().getPath().equals(ITEM_CONTADOR)) {
+                        DataMap dataMap = DataMapItem.fromDataItem(item).getDataMap();
+                        contador = dataMap.getInt(KEY_CONTADOR);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                ((TextView) findViewById(R.id.textoContador)).setText(Integer.toString(contador));
+                            }
+                        });
+                    }
+                } else if (evento.getType() == DataEvent.TYPE_DELETED) {
+                    // Algún ítem ha sido borrado
+                }
             }
         }
-    }
 
 
-    @Override
-    public void onMessageReceived(final MessageEvent mensaje) {
-        if (mensaje.getPath().equalsIgnoreCase(WEAR_MANDAR_TEXTO)) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    textView.setText(textView.getText() + "\n" + new String(mensaje.getData()));
-                }
-            });
+        @Override
+        public void onMessageReceived ( final MessageEvent mensaje){
+            if (mensaje.getPath().equalsIgnoreCase(WEAR_MANDAR_TEXTO)) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        textView.setText(textView.getText() + "\n" + new String(mensaje.getData()));
+                    }
+                });
+            }
         }
-    }
 
-}
+    }
